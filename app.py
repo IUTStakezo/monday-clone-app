@@ -10,6 +10,7 @@ app.config['SECRET_KEY'] = 'your-secret-key-here'
 
 db = SQLAlchemy(app)
 
+
 # Database Models
 class Board(db.Model):
     id = db.Column(db.Integer, primary_key=True)
