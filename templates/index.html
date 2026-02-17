@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block title %}Boards - Monday Clone{% endblock %}
+
+{% block extra_css %}
+<style>
+    .boards-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+
+    .boards-header h2 {
+        font-size: 28px;
+        font-weight: 600;
+    }
+
+    .boards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+    }
+
+    .board-card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+        color: inherit;
+        display: block;
+    }
+
+    .board-card:hover {
+        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+        transform: translateY(-2px);
+    }
+
+    .board-card h3 {
+        font-size: 18px;
+        margin-bottom: 10px;
+        color: #323338;
+    }
+
+    .board-card p {
+        color: #676879;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .board-card-footer {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #e6e9ef;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .board-date {
+        font-size: 12px;
+        color: #676879;
+    }
+
+    .board-actions {
+        display: flex;
+        gap: 8px;
+    }
+
+    .board-actions button {
+        padding: 5px 10px;
+        font-size: 12px;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    .empty-state h3 {
+        font-size: 24px;
+        margin-bottom: 10px;
+        color: #323338;
+    }
+
+    .empty-state p {
+        color: #676879;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="boards-header">
+        <h2>My Boards</h2>
+        <button class="btn btn-primary" onclick="openNewBoardModal()">+ New Board</button>
+    </div>
+
+    {% if boards %}
+    <div class="boards-grid">
+        {% for board in boards %}
+        <div class="board-card" onclick="window.location.href='/board/{{ board.id }}'">
+            <h3>{{ board.name }}</h3>
+            <p>{{ board.description or 'No description' }}</p>
+            <div class="board-card-footer">
+                <span class="board-date">Created {{ board.created_at.strftime('%b %d, %Y') }}</span>
+                <div class="board-actions">
+                    <button class="btn btn-secondary" onclick="event.stopPropagation(); editBoard({{ board.id }}, '{{ board.name }}', '{{ board.description }}')">Edit</button>
+                    <button class="btn btn-danger" onclick="event.stopPropagation(); deleteBoard({{ board.id }})">Delete</button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h3>No boards yet</h3>
+        <p>Create your first board to get started with project management!</p>
+        <button class="btn btn-primary" onclick="openNewBoardModal()">Create First Board</button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- New Board Modal -->
+<div id="boardModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalTitle">Create New Board</h2>
+            <button class="close" onclick="closeModal('boardModal')">&times;</button>
+        </div>
+        <form id="boardForm" onsubmit="saveBoard(event)">
+            <input type="hidden" id="boardId" value="">
+            <div class="form-group">
+                <label for="boardName">Board Name *</label>
+                <input type="text" id="boardName" required placeholder="e.g., Marketing Campaign">
+            </div>
+            <div class="form-group">
+                <label for="boardDescription">Description</label>
+                <textarea id="boardDescription" placeholder="What is this board about?"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Board</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function openNewBoardModal() {
+        document.getElementById('modalTitle').textContent = 'Create New Board';
+        document.getElementById('boardId').value = '';
+        document.getElementById('boardName').value = '';
+        document.getElementById('boardDescription').value = '';
+        document.getElementById('boardModal').style.display = 'block';
+    }
+
+    function editBoard(id, name, description) {
+        document.getElementById('modalTitle').textContent = 'Edit Board';
+        document.getElementById('boardId').value = id;
+        document.getElementById('boardName').value = name;
+        document.getElementById('boardDescription').value = description;
+        document.getElementById('boardModal').style.display = 'block';
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).style.display = 'none';
+    }
+
+    async function saveBoard(event) {
+        event.preventDefault();
+        
+        const boardId = document.getElementById('boardId').value;
+        const name = document.getElementById('boardName').value;
+        const description = document.getElementById('boardDescription').value;
+        
+        const url = boardId ? `/api/boards/${boardId}` : '/api/boards';
+        const method = boardId ? 'PUT' : 'POST';
+        
+        try {
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name, description })
+            });
+            
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Error saving board');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error saving board');
+        }
+    }
+
+    async function deleteBoard(id) {
+        if (!confirm('Are you sure you want to delete this board? All groups and items will be deleted.')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/boards/${id}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Error deleting board');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error deleting board');
+        }
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        const modal = document.getElementById('boardModal');
+        if (event.target == modal) {
+            modal.style.display = 'none';
+        }
+    }
+</script>
+{% endblock %}
